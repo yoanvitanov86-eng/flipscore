@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/analyze", "dest": "/api/analyze.js" }
+  ]
+}
