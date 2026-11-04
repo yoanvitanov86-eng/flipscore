@@ -27,21 +27,28 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Call Apify sync actor endpoint
+    // Call Apify sync actor endpoint with includeSeller and flattenOutput enabled
     const response = await axios.post(
       `https://api.apify.com/v2/acts/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${token}`,
-      { startUrls: [{ url }] },
-      { timeout: 50000 }
+      { 
+        startUrls: [{ url }],
+        includeSeller: true,
+        flattenOutput: true
+      },
+      { timeout: 60000 }
     );
 
     const items = response.data;
     const item = Array.isArray(items) && items.length > 0 ? items[0] : {};
 
-    // Normalize extracted fields to prevent N/A values
+    // Comprehensive fallback mapping for price and location
+    const price = item.price || item.listingPrice || item.priceFormatted || item.formattedPrice || 'N/A';
+    const location = item.location || item.city || item.place || item.locationName || 'N/A';
+
     const result = {
       title: item.title || item.heading || 'Facebook Marketplace Listing',
-      price: item.price || item.listingPrice || item.priceFormatted || 'N/A',
-      location: item.location || item.city || item.place || 'N/A',
+      price: typeof price === 'object' ? (price.formattedAmount || price.amount || 'N/A') : price,
+      location: typeof location === 'object' ? (location.name || location.city || 'N/A') : location,
       description: item.description || item.text || 'No description provided.',
       images: item.images || item.imageUrls || []
     };
