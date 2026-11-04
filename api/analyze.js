@@ -1,8 +1,7 @@
 const axios = require('axios');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize the Gemini SDK using the Vercel environment variable
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -30,7 +29,7 @@ module.exports = async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!apifyToken || !geminiKey) {
-    return res.status(500).json({ error: 'APIFY_TOKEN or GEMINI_API_KEY environment variables are not fully configured in Vercel.' });
+    return res.status(500).json({ error: 'APIFY_TOKEN or GEMINI_API_KEY environment variables are not configured in Vercel.' });
   }
 
   try {
@@ -65,7 +64,9 @@ module.exports = async (req, res) => {
     const description = item.description || item.text || 'No description provided.';
     const images = item.images || item.imageUrls || [];
 
-    // 2. Pass scraped data to Gemini for expert analysis and reasoning
+    // 2. Pass scraped data to Gemini for expert reasoning
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
     const prompt = `
     You are an expert automotive engineer, car flipper, and market pricing specialist. Analyze the following Facebook Marketplace car listing for a user whose buying intent is "${intent}":
     
@@ -74,7 +75,7 @@ module.exports = async (req, res) => {
     Location: ${nativeLocation}
     Description: ${description}
 
-    Return a clean JSON object (without markdown code block wrappers if possible, or parseable JSON) containing exactly these keys:
+    Return ONLY a valid JSON object (no markdown formatting blocks, no extra text) with exactly these keys:
     {
       "estimatedMarketPrice": "Estimated market value range (e.g. €8,000 - €10,550)",
       "originalMSRP": "Approximate original new car MSRP or price",
@@ -89,22 +90,20 @@ module.exports = async (req, res) => {
     }
     `;
 
-    const geminiResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+    const geminiResult = await model.generateContent(prompt);
+    const geminiResponseText = geminiResult.response.text();
 
     let intelligence = {};
     try {
-      const rawText = geminiResponse.text.replace(/```json/g, '').replace(/```/g, '').trim();
-      intelligence = JSON.parse(rawText);
+      const cleanJson = geminiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      intelligence = JSON.parse(cleanJson);
     } catch (parseErr) {
       intelligence = {
-        estimatedMarketPrice: "Unavailable",
+        estimatedMarketPrice: "Unable to calculate",
         originalMSRP: "N/A",
         riskLevel: "Unverified",
-        commonIssues: ["Perform a thorough on-site mechanical inspection."],
-        dealVerdict: "Could not automatically parse AI intelligence model output.",
+        commonIssues: ["Review description manually for mechanical faults."],
+        dealVerdict: geminiResponseText || "Could not parse structured intelligence.",
         flipScore: "N/A"
       };
     }
