@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlipScore.site - Facebook Marketplace Car Deal Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full bg-slate-50 text-slate-800 font-sans antialiased flex flex-col justify-between">
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-primary-600 text-white p-2 rounded-xl font-bold tracking-wider shadow-sm shadow-blue-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <span class="text-xl font-black tracking-tight text-slate-900">FlipScore<span class="text-primary-600">.site</span></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-primary-700">
+                    Live Scraper Mode
+                </span>
+                <button onclick="switchTab('analyze')" id="nav-analyze" class="text-sm font-semibold text-primary-600 px-3 py-2 rounded-lg bg-blue-50 transition">Analyze Link</button>
+                <button onclick="switchTab('search')" id="nav-search" class="text-sm font-semibold text-slate-600 hover:text-primary-600 px-3 py-2 rounded-lg transition">Find Deals (Apify)</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+
+        <!-- TAB 1: ANALYZE INDIVIDUAL LISTING -->
+        <div id="tab-analyze" class="space-y-6 max-w-3xl mx-auto">
+            <div class="text-center space-y-2">
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">AI Car Deal & Scam Analyzer</h1>
+                <p class="text-slate-500 text-sm">Paste any Facebook Marketplace car listing link to instantly evaluate if it's a steal or a trap.</p>
+            </div>
+
+            <!-- Input Card -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Facebook Marketplace Item URL</label>
+                    <input type="text" id="fb-url" placeholder="https://www.facebook.com/marketplace/item/..." class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button onclick="setIntent('Daily Driver')" id="intent-Daily" class="intent-btn p-3 text-left border-2 border-primary-600 bg-blue-50/50 rounded-xl transition">
+                        <div class="text-xs font-bold text-primary-700">🚗 Daily Driver</div>
+                        <div class="text-[11px] text-slate-500">Focus on reliability & maintenance</div>
+                    </button>
+                    <button onclick="setIntent('Project Car')" id="intent-Project" class="intent-btn p-3 text-left border-2 border-slate-200 hover:border-slate-300 rounded-xl transition">
+                        <div class="text-xs font-bold text-slate-700">🏎️ Project Car</div>
+                        <div class="text-[11px] text-slate-500">Focus on margin & mod potential</div>
+                    </button>
+                    <button onclick="setIntent('Quick Flip')" id="intent-Flip" class="intent-btn p-3 text-left border-2 border-slate-200 hover:border-slate-300 rounded-xl transition">
+                        <div class="text-xs font-bold text-slate-700">💰 Quick Flip</div>
+                        <div class="text-[11px] text-slate-500">Focus on profit spread & resale</div>
+                    </button>
+                </div>
+
+                <!-- Pricing Options -->
+                <div class="pt-2 border-t border-slate-100">
+                    <span class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Select Search Pass (Beta Test Simulator)</span>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div onclick="selectPackage(1, 1.50)" id="pkg-1" class="pkg-card cursor-pointer p-3 border-2 border-primary-600 bg-blue-50/40 rounded-xl text-center transition">
+                            <div class="text-sm font-bold text-slate-900">1 Search</div>
+                            <div class="text-xs font-semibold text-primary-600">$1.50</div>
+                        </div>
+                        <div onclick="selectPackage(5, 5.00)" id="pkg-5" class="pkg-card cursor-pointer p-3 border-2 border-slate-200 rounded-xl text-center transition">
+                            <div class="text-sm font-bold text-slate-900">5 Searches</div>
+                            <div class="text-xs font-semibold text-primary-600">$5.00</div>
+                        </div>
+                        <div onclick="selectPackage(10, 8.00)" id="pkg-10" class="pkg-card cursor-pointer p-3 border-2 border-slate-200 rounded-xl text-center transition">
+                            <div class="text-sm font-bold text-slate-900">10 Searches</div>
+                            <div class="text-xs font-semibold text-primary-600">$8.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="runAnalysis()" id="analyze-btn" class="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition flex items-center justify-center space-x-2">
+                    <span>Analyze Deal & Pay <span id="checkout-price">$1.50</span></span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-box" class="hidden bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-4 shadow-sm">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent"></div>
+                <div class="space-y-1">
+                    <h3 class="text-base font-bold text-slate-900" id="loading-text">Connecting to Apify Marketplace Scraper...</h3>
+                    <p class="text-xs text-slate-500">Extracting live listing data and running evaluation...</p>
+                </div>
+            </div>
+
+            <!-- Results Card Container (Hidden Initially) -->
+            <div id="results-box" class="hidden bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-100 gap-4">
+                    <div>
+                        <span id="res-badge" class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-lg">VERIFIED LISTING</span>
+                        <h2 id="res-title" class="text-xl font-bold text-slate-900 mt-1">Car Listing Title</h2>
+                        <p id="res-price-loc" class="text-sm text-slate-500">Price & Location</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-semibold text-slate-400 uppercase">Analysis Intent</div>
+                        <div id="res-intent-disp" class="text-sm font-bold text-primary-600">Daily Driver</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-4 rounded-xl space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wide">📋 Listing Description & Details</h4>
+                    <p id="res-desc" class="text-xs text-slate-600 leading-relaxed whitespace-pre-line">Description loaded from scraper...</p>
+                </div>
+
+                <div class="bg-slate-50 p-4 rounded-xl flex items-center justify-between text-xs text-slate-600">
+                    <span>Backend Status: <strong class="text-emerald-600">Connected Securely via Vercel</strong></span>
+                    <button onclick="resetAnalyzer()" class="text-primary-600 font-bold hover:underline">Analyze Another Link</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: FIND DEALS (APIFY FILTER BUILDER) -->
+        <div id="tab-search" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div class="text-center space-y-2">
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Apify Marketplace Filter & Search Builder</h1>
+                <p class="text-slate-500 text-sm">Configure your search parameters to scrape vehicle inventory directly from Facebook Marketplace.</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Keyword to Search</label>
+                        <input type="text" id="f-keyword" value="used cars" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Max Price ($)</label>
+                        <input type="number" id="f-maxprice" value="8000" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    </div>
+                </div>
+                <button onclick="triggerSearchMock()" class="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition">
+                    Test Apify Search Filter Payload
+                </button>
+            </div>
+
+            <div id="search-log-box" class="hidden bg-slate-900 text-emerald-400 font-mono text-xs p-4 rounded-xl overflow-x-auto space-y-1">
+                <div>[Apify Engine] Initializing actor run securely...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-1">
+            <p>© 2026 FlipScore.site — Powered by Apify & Serverless Infrastructure.</p>
+        </div>
+    </footer>
+
+    <!-- Interactive Script -->
+    <script>
+        let currentIntent = 'Daily Driver';
+        let selectedCredits = 1;
+        let selectedPrice = 1.50;
+
+        function switchTab(tab) {
+            if (tab === 'analyze') {
+                document.getElementById('tab-analyze').classList.remove('hidden');
+                document.getElementById('tab-search').classList.add('hidden');
+                document.getElementById('nav-analyze').className = 'text-sm font-semibold text-primary-600 px-3 py-2 rounded-lg bg-blue-50 transition';
+                document.getElementById('nav-search').className = 'text-sm font-semibold text-slate-600 hover:text-primary-600 px-3 py-2 rounded-lg transition';
+            } else {
+                document.getElementById('tab-search').classList.remove('hidden');
+                document.getElementById('tab-analyze').classList.add('hidden');
+                document.getElementById('nav-search').className = 'text-sm font-semibold text-primary-600 px-3 py-2 rounded-lg bg-blue-50 transition';
+                document.getElementById('nav-analyze').className = 'text-sm font-semibold text-slate-600 hover:text-primary-600 px-3 py-2 rounded-lg transition';
+            }
+        }
+
+        function setIntent(intent) {
+            currentIntent = intent;
+            document.querySelectorAll('.intent-btn').forEach(btn => {
+                btn.className = 'intent-btn p-3 text-left border-2 border-slate-200 hover:border-slate-300 rounded-xl transition';
+                btn.querySelector('div').className = 'text-xs font-bold text-slate-700';
+            });
+            const activeBtn = document.getElementById(`intent-${intent.split(' ')[0]}`);
+            activeBtn.className = 'intent-btn p-3 text-left border-2 border-primary-600 bg-blue-50/50 rounded-xl transition';
+            activeBtn.querySelector('div').className = 'text-xs font-bold text-primary-700';
+        }
+
+        function selectPackage(credits, price) {
+            selectedCredits = credits;
+            selectedPrice = price;
+            document.querySelectorAll('.pkg-card').forEach(card => {
+                card.className = 'pkg-card cursor-pointer p-3 border-2 border-slate-200 rounded-xl text-center transition';
+            });
+            document.getElementById(`pkg-${credits}`).className = 'pkg-card cursor-pointer p-3 border-2 border-primary-600 bg-blue-50/40 rounded-xl text-center transition';
+            document.getElementById('checkout-price').innerText = `$${price.toFixed(2)}`;
+        }
+
+        async function runAnalysis() {
+            const urlInput = document.getElementById('fb-url').value;
+            if(!urlInput) {
+                alert("Please paste a valid Facebook Marketplace URL first!");
+                return;
+            }
+
+            document.querySelector('#tab-analyze > div.bg-white').classList.add('hidden');
+            document.getElementById('loading-box').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+
+                const result = await response.json();
+
+                if(result.success) {
+                    document.getElementById('loading-box').classList.add('hidden');
+                    document.getElementById('results-box').classList.remove('hidden');
+                    
+                    document.getElementById('res-title').innerText = result.data.title || "Facebook Marketplace Listing";
+                    document.getElementById('res-price-loc').innerText = `Price: ${result.data.price || 'N/A'} • Location: ${result.data.location || 'N/A'}`;
+                    document.getElementById('res-intent-disp').innerText = currentIntent;
+                    document.getElementById('res-desc').innerText = result.data.description || "No description provided.";
+                } else {
+                    alert("Error: " + (result.error || "Failed to analyze link."));
+                    resetAnalyzer();
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Network error occurred while connecting to serverless backend.");
+                resetAnalyzer();
+            }
+        }
+
+        function resetAnalyzer() {
+            document.getElementById('results-box').classList.add('hidden');
+            document.querySelector('#tab-analyze > div.bg-white').classList.remove('hidden');
+            document.getElementById('fb-url').value = '';
+        }
+
+        function triggerSearchMock() {
+            const logBox = document.getElementById('search-log-box');
+            logBox.classList.remove('hidden');
+            logBox.innerHTML = `<div>[Apify Engine] Search query executed successfully.</div>`;
+        }
+    </script>
+</body>
+</html>
