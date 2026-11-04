@@ -18,8 +18,6 @@ module.exports = async (req, res) => {
   const url = body.url;
   const intent = body.intent || 'Daily Driver';
 
-  console.log(`[FlipScore] Received request for URL: ${url} with intent: ${intent}`);
-
   if (!url) {
     return res.status(400).json({ error: 'Listing URL is required' });
   }
@@ -28,12 +26,11 @@ module.exports = async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!apifyToken || !geminiKey) {
-    console.error('[FlipScore Error] Missing environment variables!');
     return res.status(500).json({ error: 'APIFY_TOKEN or GEMINI_API_KEY environment variables are missing on Vercel.' });
   }
 
   try {
-    console.log('[FlipScore] Calling Apify scraper...');
+    // 1. Scrape listing data via Apify
     const response = await axios.post(
       `https://api.apify.com/v2/acts/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${apifyToken}`,
       { 
@@ -45,8 +42,6 @@ module.exports = async (req, res) => {
     );
 
     const items = response.data;
-    console.log(`[FlipScore] Apify returned ${Array.isArray(items) ? items.length : 'non-array'} items.`);
-    
     const item = Array.isArray(items) && items.length > 0 ? items[0] : {};
 
     let nativePrice = 'N/A';
@@ -65,8 +60,7 @@ module.exports = async (req, res) => {
     const description = item.description || item.text || 'No description provided.';
     const images = item.images || item.imageUrls || [];
 
-    console.log(`[FlipScore] Extracted Title: "${title}". Calling Gemini API...`);
-
+    // 2. Query Gemini API via REST
     const prompt = `You are an expert automotive engineer and car flipper. Analyze this car listing for a user whose buying intent is "${intent}":
 
 Title: ${title}
@@ -101,7 +95,11 @@ You MUST reply with ONLY a raw JSON object with these exact keys, no markdown, n
       const geminiResp = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`,
         {
-          contents: [{ parts: [{ text: prompt }] }]
+          contents: [
+            {
+              parts: [{ text: prompt }]
+            }
+          ]
         },
         {
           headers: {
@@ -112,7 +110,6 @@ You MUST reply with ONLY a raw JSON object with these exact keys, no markdown, n
         }
       );
 
-      console.log('[FlipScore] Gemini API responded successfully!');
       const rawGeminiText = geminiResp.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const cleanJson = rawGeminiText.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
@@ -120,7 +117,7 @@ You MUST reply with ONLY a raw JSON object with these exact keys, no markdown, n
         intelligence = parsed;
       }
     } catch (aiErr) {
-      console.error('[FlipScore Gemini Error]', aiErr.response?.data || aiErr.message);
+      console.error('Gemini API Error details:', aiErr.response?.data || aiErr.message);
     }
 
     return res.status(200).json({
@@ -133,7 +130,7 @@ You MUST reply with ONLY a raw JSON object with these exact keys, no markdown, n
     });
 
   } catch (error) {
-    console.error('[FlipScore Execution Error]', error.response?.data || error.message);
+    console.error('Execution error:', error.response?.data || error.message);
     return res.status(500).json({ 
       error: 'Failed to process listing analysis', 
       details: error.response?.data?.error?.message || error.message 
