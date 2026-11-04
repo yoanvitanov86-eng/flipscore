@@ -1,54 +1,57 @@
 const axios = require('axios');
 
-export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-    const { url } = req.body;
-    if (!url) {
-        return res.status(400).json({ error: 'Missing Facebook Marketplace URL' });
-    }
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
-    // Pulls your token securely from Vercel Environment Variables (never exposed on GitHub)
-    const APIFY_TOKEN = process.env.APIFY_TOKEN;
-    if (!APIFY_TOKEN) {
-        return res.status(500).json({ error: 'Server configuration error: Apify token not set.' });
-    }
+  const { url } = req.method === 'POST' ? req.body : req.query;
 
-    // Using memo23's synchronous endpoint which runs the scraper and returns items directly
-    const ACTOR_ENDPOINT = `https://api.apify.com/v2/actors/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
+  if (!url) {
+    return res.status(400).json({ error: 'Listing URL is required' });
+  }
 
-    try {
-        // Trigger actor synchronously and pass the user's item URL
-        const response = await axios.post(ACTOR_ENDPOINT, {
-            startUrls: [{ url: url }],
-            includeSeller: true
-        }, {
-            timeout: 50000 // Give it up to 50 seconds to scrape the page
-        });
+  const token = process.env.APIFY_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'APIFY_TOKEN environment variable is not configured in Vercel' });
+  }
 
-        const items = response.data;
-        if (!items || items.length === 0) {
-            return res.status(404).json({ error: 'Could not extract data from this listing URL.' });
-        }
+  try {
+    // Call Apify sync actor endpoint
+    const response = await axios.post(
+      `https://api.apify.com/v2/acts/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${token}`,
+      { startUrls: [{ url }] },
+      { timeout: 50000 }
+    );
 
-        const listingData = items[0]; // The scraped vehicle details object
+    const items = response.data;
+    const item = Array.isArray(items) && items.length > 0 ? items[0] : {};
 
-        return res.status(200).json({
-            success: true,
-            data: {
-                title: listingData.title,
-                price: listingData.price,
-                location: listingData.location,
-                description: listingData.description || listingData.moreDetails?.redacted_description,
-                vehicle: listingData.vehicle || {}, 
-                photos: listingData.listingPhotos || []
-            }
-        });
+    // Normalize extracted fields to prevent N/A values
+    const result = {
+      title: item.title || item.heading || 'Facebook Marketplace Listing',
+      price: item.price || item.listingPrice || item.priceFormatted || 'N/A',
+      location: item.location || item.city || item.place || 'N/A',
+      description: item.description || item.text || 'No description provided.',
+      images: item.images || item.imageUrls || []
+    };
 
-    } catch (error) {
-        console.error('Apify Scraping Error:', error.message);
-        return res.status(500).json({ error: 'Failed to scrape the Facebook Marketplace link.' });
-    }
-}
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Scraper error:', error.response?.data || error.message);
+    return res.status(500).json({ 
+      error: 'Failed to extract listing data', 
+      details: error.response?.data?.error?.message || error.message 
+    });
+  }
+};
