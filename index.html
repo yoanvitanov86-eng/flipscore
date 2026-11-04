@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FlipScore.site | AI Car Deal & Scam Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vercel Web Analytics Tracker -->
+    <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-cyan-500 selection:text-black">
     <div class="max-w-3xl mx-auto px-4 py-12">
@@ -97,7 +99,7 @@
                     <p id="res-verdict" class="text-sm text-slate-300 leading-relaxed italic"></p>
                 </div>
 
-                <!-- Common Issues / What Can Go Wrong -->
+                <!-- Common Issues -->
                 <div>
                     <span class="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-2">Common Weak Points & Things That Can Go Wrong</span>
                     <ul id="res-issues" class="list-disc list-inside text-xs text-slate-300 space-y-1.5 bg-slate-950 p-4 rounded-xl border border-slate-800">
@@ -119,4 +121,75 @@
         document.querySelectorAll('.intent-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.intent-btn').forEach(b => {
-                    b.className = 'intent-btn border border-slate-800 bg-slate-950 text-slate-400 rounded-xl py-2.5 text-xs font-
+                    b.className = 'intent-btn border border-slate-800 bg-slate-950 text-slate-400 rounded-xl py-2.5 text-xs font-bold hover:border-slate-700 transition-all';
+                });
+                e.target.className = 'intent-btn border border-cyan-500 bg-cyan-500/10 text-cyan-400 rounded-xl py-2.5 text-xs font-bold transition-all';
+                selectedIntent = e.target.getAttribute('data-intent');
+            });
+        });
+
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            const url = document.getElementById('listing-url').value.trim();
+            if (!url) {
+                alert('Please enter a valid Facebook Marketplace URL.');
+                return;
+            }
+
+            document.getElementById('input-section').classList.add('hidden');
+            document.getElementById('loading-section').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, intent: selectedIntent })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to analyze');
+
+                document.getElementById('res-title').innerText = data.title;
+                document.getElementById('res-price').innerText = data.price;
+                document.getElementById('res-location').innerText = data.location;
+                document.getElementById('res-description').innerText = data.description;
+                document.getElementById('res-intent-label').innerText = selectedIntent;
+
+                const intel = data.intelligence || {};
+                document.getElementById('res-market-price').innerText = intel.estimatedMarketPrice || 'N/A';
+                document.getElementById('res-msrp').innerText = intel.originalMSRP || 'N/A';
+                document.getElementById('res-risk').innerText = intel.riskLevel || 'Unknown';
+                document.getElementById('res-verdict').innerText = `"${intel.dealVerdict || 'No verdict provided.'}"`;
+                document.getElementById('res-flip-score').innerText = intel.flipScore || '--/10';
+
+                const issuesList = document.getElementById('res-issues');
+                issuesList.innerHTML = '';
+                if (intel.commonIssues && Array.isArray(intel.commonIssues)) {
+                    intel.commonIssues.forEach(issue => {
+                        const li = document.createElement('li');
+                        li.innerText = issue;
+                        issuesList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.innerText = 'No specific model faults listed.';
+                    issuesList.appendChild(li);
+                }
+
+                document.getElementById('loading-section').classList.add('hidden');
+                document.getElementById('results-section').classList.remove('hidden');
+            } catch (err) {
+                alert('Error: ' + err.message);
+                document.getElementById('loading-section').classList.add('hidden');
+                document.getElementById('input-section').classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            document.getElementById('listing-url').value = '';
+            document.getElementById('results-section').classList.add('hidden');
+            document.getElementById('input-section').classList.add('hidden');
+            document.getElementById('input-section').classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
