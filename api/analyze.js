@@ -1,7 +1,4 @@
 const axios = require('axios');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -64,38 +61,41 @@ module.exports = async (req, res) => {
     const description = item.description || item.text || 'No description provided.';
     const images = item.images || item.imageUrls || [];
 
-    // 2. Pass scraped data to Gemini for expert reasoning
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // 2. Query Gemini API directly via REST (using standard fetch)
+    const prompt = `You are an expert automotive engineer, car flipper, and market pricing specialist. Analyze the following Facebook Marketplace car listing for a user whose buying intent is "${intent}":
 
-    const prompt = `
-    You are an expert automotive engineer, car flipper, and market pricing specialist. Analyze the following Facebook Marketplace car listing for a user whose buying intent is "${intent}":
-    
-    Title: ${title}
-    Listed Price: ${nativePrice}
-    Location: ${nativeLocation}
-    Description: ${description}
+Title: ${title}
+Listed Price: ${nativePrice}
+Location: ${nativeLocation}
+Description: ${description}
 
-    Return ONLY a valid JSON object (no markdown formatting blocks, no extra text) with exactly these keys:
-    {
-      "estimatedMarketPrice": "Estimated market value range (e.g. €8,000 - €10,550)",
-      "originalMSRP": "Approximate original new car MSRP or price",
-      "riskLevel": "Low Risk / Moderate Risk / High Risk / Severe Mechanical Risk",
-      "commonIssues": [
-        "Issue 1 typical for this model",
-        "Issue 2 typical for this model",
-        "Issue 3 typical for this model"
-      ],
-      "dealVerdict": "A concise expert judgment on whether this specific listing is a steal, fair deal, or dangerous trap based on the description.",
-      "flipScore": "A rating out of 10 (e.g. '6.5/10')"
-    }
-    `;
+Return ONLY a valid JSON object with exactly these keys and nothing else:
+{
+  "estimatedMarketPrice": "Estimated market value range (e.g. €8,000 - €10,550)",
+  "originalMSRP": "Approximate original new car MSRP or price",
+  "riskLevel": "Low Risk / Moderate Risk / High Risk / Severe Mechanical Risk",
+  "commonIssues": [
+    "Issue 1 typical for this model",
+    "Issue 2 typical for this model",
+    "Issue 3 typical for this model"
+  ],
+  "dealVerdict": "A concise expert judgment on whether this specific listing is a steal, fair deal, or dangerous trap based on the description.",
+  "flipScore": "A rating out of 10 (e.g. '6.5/10')"
+}`;
 
-    const geminiResult = await model.generateContent(prompt);
-    const geminiResponseText = geminiResult.response.text();
+    const geminiResp = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }]
+      },
+      { timeout: 30000 }
+    );
+
+    const rawGeminiText = geminiResp.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
 
     let intelligence = {};
     try {
-      const cleanJson = geminiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const cleanJson = rawGeminiText.replace(/```json/g, '').replace(/```/g, '').trim();
       intelligence = JSON.parse(cleanJson);
     } catch (parseErr) {
       intelligence = {
@@ -103,7 +103,7 @@ module.exports = async (req, res) => {
         originalMSRP: "N/A",
         riskLevel: "Unverified",
         commonIssues: ["Review description manually for mechanical faults."],
-        dealVerdict: geminiResponseText || "Could not parse structured intelligence.",
+        dealVerdict: rawGeminiText || "Could not parse structured intelligence.",
         flipScore: "N/A"
       };
     }
@@ -121,7 +121,7 @@ module.exports = async (req, res) => {
     console.error('Execution error:', error.response?.data || error.message);
     return res.status(500).json({ 
       error: 'Failed to process listing analysis', 
-      details: error.message 
+      details: error.response?.data?.error?.message || error.message 
     });
   }
 };
