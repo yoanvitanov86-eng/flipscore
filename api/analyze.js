@@ -135,11 +135,10 @@ module.exports = async (req, res) => {
       intelligence
     });
 
-  } catch (error) {
+ } catch (error) {
     console.error('Execution error:', error.response?.data || error.message);
     return res.status(500).json({ 
-      error: 'Failed to process listing analysis', 
-      details: error.response?.data?.error?.message || error.message 
+      error: error.message, 
+      details: error.response?.data || error.stack || 'No extra details'
     });
   }
-};
