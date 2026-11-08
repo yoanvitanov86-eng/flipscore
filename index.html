@@ -33,7 +33,7 @@
                     </div>
                 </div>
                 <button id="analyze-btn" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold py-3.5 rounded-xl transition-all shadow-lg shadow-cyan-500/20 text-sm tracking-wide">
-                    ANALYZE LISTING WITH GEMINI AI
+                    ANALYZE LISTING WITH AI
                 </button>
             </div>
         </div>
@@ -41,7 +41,7 @@
         <!-- Loading State -->
         <div id="loading-section" class="hidden text-center py-16">
             <div class="inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-slate-400 text-sm animate-pulse">Scraping Marketplace data & running Gemini AI automotive analysis...</p>
+            <p class="text-slate-400 text-sm animate-pulse">Scraping Marketplace data & running Gemini live search reasoning...</p>
         </div>
 
         <!-- Results Section -->
@@ -51,34 +51,34 @@
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <span id="res-badge" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-md font-semibold">VERIFIED LISTING</span>
-                        <h2 id="res-title" class="text-xl font-bold mt-2">Car Listing Title</h2>
+                        <h2 id="res-title" class="text-xl font-bold mt-2 text-white">Car Listing Title</h2>
                     </div>
                     <div class="text-right">
-                        <span class="text-xs text-slate-500 block uppercase">Analysis Intent</span>
+                        <span class="text-xs text-slate-500 block uppercase">Intent</span>
                         <span id="res-intent-label" class="text-sm font-bold text-cyan-400">Daily Driver</span>
                     </div>
                 </div>
                 <div class="flex gap-6 text-sm text-slate-300 border-y border-slate-800 py-3 my-4">
-                    <div>Price: <strong id="res-price" class="text-white">N/A</strong></div>
+                    <div>Asking Price: <strong id="res-price" class="text-white">N/A</strong></div>
                     <div>Location: <strong id="res-location" class="text-white">N/A</strong></div>
                 </div>
                 <div>
-                    <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Listing Description & Details</h3>
-                    <p id="res-description" class="text-slate-300 text-sm bg-slate-950 p-4 rounded-xl border border-slate-800/60 max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed"></p>
+                    <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Original Listing Description</h3>
+                    <p id="res-description" class="text-slate-300 text-sm bg-slate-950 p-4 rounded-xl border border-slate-800/60 max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed"></p>
                 </div>
             </div>
 
-            <!-- AI Intelligence Breakdown -->
-            <div class="bg-slate-900/90 border border-cyan-900/50 rounded-2xl p-6 shadow-xl space-y-4">
+            <!-- AI Intelligence Reasoning Breakdown -->
+            <div class="bg-slate-900/90 border border-cyan-900/50 rounded-2xl p-6 shadow-xl space-y-5">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <h3 class="text-xs uppercase tracking-wider text-cyan-400 font-bold">Gemini AI Valuation & Deal Verdict</h3>
+                    <h3 class="text-xs uppercase tracking-wider text-cyan-400 font-bold">AI Market Reasoning & Deal Verdict</h3>
                     <div class="text-right">
                         <span class="text-xs text-slate-400 mr-2">FlipScore:</span>
                         <span id="res-flip-score" class="text-base font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-800 px-3 py-1 rounded-lg">--/10</span>
                     </div>
                 </div>
 
-                <!-- Grid Stats -->
+                <!-- Valuation Grid Stats -->
                 <div class="grid grid-cols-2 gap-4 text-sm">
                     <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
                         <span class="text-xs text-slate-500 block uppercase font-medium">Estimated Market Value</span>
@@ -99,17 +99,17 @@
                     <p id="res-verdict" class="text-sm text-slate-300 leading-relaxed italic"></p>
                 </div>
 
-                <!-- Common Issues -->
+                <!-- Common Issues & What to Look For -->
                 <div>
-                    <span class="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-2">Common Weak Points & Things That Can Go Wrong</span>
-                    <ul id="res-issues" class="list-disc list-inside text-xs text-slate-300 space-y-1.5 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <span class="text-xs uppercase tracking-wider text-cyan-400 font-bold block mb-2">Common Weak Points & Buyer's Checklist</span>
+                    <ul id="res-issues" class="list-disc list-inside text-xs text-slate-300 space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800 leading-relaxed">
                         <!-- Injected via script -->
                     </ul>
                 </div>
             </div>
 
             <div class="flex justify-between items-center px-2">
-                <span class="text-xs text-slate-500">Backend Status: <span class="text-emerald-400 font-medium">Connected Securely via Vercel & Gemini AI</span></span>
+                <span class="text-xs text-slate-500">Backend Status: <span class="text-emerald-400 font-medium">Connected via Vercel & Gemini Search</span></span>
                 <button id="reset-btn" class="text-xs text-cyan-400 hover:underline font-semibold">Analyze Another Link</button>
             </div>
         </div>
