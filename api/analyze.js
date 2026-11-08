@@ -80,7 +80,7 @@ module.exports = async (req, res) => {
       - Location: "${nativeLocation}"
       - Description: "${description}"
 
-      Return a strict JSON object (do not include markdown block ticks like \`\`\`json if possible, just output raw valid JSON) with the following structure:
+      Return a strict JSON object (do not include markdown code block ticks like \`\`\`json, just output raw valid JSON) with the following exact structure:
       {
         "estimatedMarketPrice": "Estimated current average street price range (e.g. $6,500 - $8,000)",
         "originalMSRP": "Original ballpark MSRP when new (e.g. ~$28,000)",
@@ -101,7 +101,7 @@ module.exports = async (req, res) => {
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.2, // Keep analytical and realistic
+        temperature: 0.2,
       },
     });
 
@@ -113,7 +113,6 @@ module.exports = async (req, res) => {
     try {
       intelligence = JSON.parse(rawText);
     } catch (parseErr) {
-      // Fallback if formatting drifts slightly
       intelligence = {
         estimatedMarketPrice: "Check listings manually",
         originalMSRP: "N/A",
@@ -137,7 +136,7 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-    console.err('Execution error:', error.response?.data || error.message);
+    console.error('Execution error:', error.response?.data || error.message);
     return res.status(500).json({ 
       error: 'Failed to process listing analysis', 
       details: error.response?.data?.error?.message || error.message 
