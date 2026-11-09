@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FlipScore.site | Test Mode</title>
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-cyan-500 selection:text-black">
@@ -21,7 +21,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Facebook Marketplace URL</label>
-                    <input type="text" id="listing-url" placeholder="[https://www.facebook.com/marketplace/item/](https://www.facebook.com/marketplace/item/)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors">
+                    <input type="text" id="listing-url" placeholder="https://www.facebook.com/marketplace/item/..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors">
                 </div>
                 <div>
                     <label class="block text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Analysis Intent</label>
@@ -155,7 +155,19 @@
                 });
 
                 const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Failed to analyze');
+
+                // Render debug logs even if error occurs
+                if (data.debugLogs) {
+                    const logContainer = document.getElementById('debug-logs-container');
+                    logContainer.innerHTML = '';
+                    data.debugLogs.forEach(log => {
+                        const div = document.createElement('div');
+                        div.innerText = log;
+                        logContainer.appendChild(div);
+                    });
+                }
+
+                if (!response.ok) throw new Error(data.error || data.details || 'Failed to analyze');
 
                 document.getElementById('res-title').innerText = data.title;
                 document.getElementById('res-price').innerText = data.price;
@@ -182,19 +194,6 @@
                     const li = document.createElement('li');
                     li.innerText = 'No specific model faults listed.';
                     issuesList.appendChild(li);
-                }
-
-                // Render debug logs
-                const logContainer = document.getElementById('debug-logs-container');
-                logContainer.innerHTML = '';
-                if (data.debugLogs && Array.isArray(data.debugLogs)) {
-                    data.debugLogs.forEach(log => {
-                        const div = document.createElement('div');
-                        div.innerText = log;
-                        logContainer.appendChild(div);
-                    });
-                } else {
-                    logContainer.innerText = 'No logs returned.';
                 }
 
                 document.getElementById('loading-section').classList.add('hidden');
