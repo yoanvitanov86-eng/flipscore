@@ -34,10 +34,15 @@ module.exports = async (req, res) => {
     });
   }
 
+  let logs = [];
+  logs.push(`[${new Date().toISOString()}] Request received for intent: "${intent}"`);
+  logs.push(`[${new Date().toISOString()}] Target URL: ${url}`);
+
   try {
-    // 1. Scrape listing data via Apify (capped at 9 seconds to beat Vercel's 10s limit)
+    // 1. Scrape listing data via Apify (capped at 8 seconds for Vercel)
     let item = {};
     try {
+      logs.push(`[${new Date().toISOString()}] Triggering Apify actor (memo23/facebook-marketplace-cheerio)...`);
       const response = await axios.post(
         `https://api.apify.com/v2/acts/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${apifyToken}`,
         { 
@@ -45,13 +50,13 @@ module.exports = async (req, res) => {
           includeSeller: true,
           flattenOutput: true
         },
-        { timeout: 9000 } // 9 second safeguard for Vercel free tier
+        { timeout: 8000 }
       );
       const items = response.data;
       item = Array.isArray(items) && items.length > 0 ? items[0] : {};
+      logs.push(`[${new Date().toISOString()}] Apify scrape successful. Items retrieved: ${items.length}`);
     } catch (scrapeErr) {
-      console.warn('Apify scrape timed out or failed, falling back to URL-based AI parsing:', scrapeErr.message);
-      // Fallback: If Apify takes too long, let Gemini analyze the URL/title directly
+      logs.push(`[${new Date().toISOString()}] Apify warning/timeout: ${scrapeErr.message}. Proceeding with URL/AI direct evaluation.`);
     }
 
     let nativePrice = 'N/A';
@@ -67,15 +72,15 @@ module.exports = async (req, res) => {
     }
 
     const title = item.title || item.heading || url;
-    const description = item.description || item.text || 'Scraped via direct link analysis.';
+    const description = item.description || item.text || 'Direct link analysis mode.';
     const images = item.images || item.imageUrls || [];
 
-    // 2. Build the AI Prompt with User Intent & Data
+    // 2. Build Prompt
     const prompt = `
       You are an expert automotive appraiser, mechanic, and car flipping strategist. 
       Analyze this car listing based on the title/description and URL provided, keeping in mind the user's buying intent: "${intent}".
       
-      Use Google Search to cross-reference current online market trends, actual average street pricing, factory MSRP, and well-known mechanical failure points for this exact vehicle platform/engine.
+      Cross-reference current market pricing, average street value, and common mechanical failure points for this exact vehicle platform/engine.
 
       Listing Data:
       - Source URL: "${url}"
@@ -84,7 +89,7 @@ module.exports = async (req, res) => {
       - Location: "${nativeLocation}"
       - Description: "${description}"
 
-      Return a strict JSON object (do not include markdown code block ticks, output raw valid JSON only) with this exact structure:
+      Return a strict JSON object (do NOT wrap in markdown code blocks like \`\`\`json, output raw valid JSON only) with this exact structure:
       {
         "estimatedMarketPrice": "Estimated current average street price range (e.g. $6,500 - $8,000)",
         "originalMSRP": "Original ballpark MSRP when new (e.g. ~$28,000)",
@@ -99,23 +104,29 @@ module.exports = async (req, res) => {
       }
     `;
 
-    // 3. Call Gemini with Google Search grounding enabled
+    logs.push(`[${new Date().toISOString()}] Sending payload to Gemini API (gemini-2.5-flash)...`);
+
+    // 3. Call Gemini
     const geminiResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
         temperature: 0.2,
       },
     });
 
-    let rawText = geminiResponse.text.trim();
+    let rawText = geminiResponse.text ? geminiResponse.text.trim() : '';
+    logs.push(`[${new Date().toISOString()}] Raw Gemini response received (${rawText.length} chars).`);
+
+    // Clean up potential markdown formatting
     rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
     let intelligence;
     try {
       intelligence = JSON.parse(rawText);
+      logs.push(`[${new Date().toISOString()}] JSON parsed successfully.`);
     } catch (parseErr) {
+      logs.push(`[${new Date().toISOString()}] JSON parse error: ${parseErr.message}. Using fallback structure.`);
       intelligence = {
         estimatedMarketPrice: nativePrice !== 'N/A' ? nativePrice : "Check local market",
         originalMSRP: "N/A",
@@ -135,15 +146,17 @@ module.exports = async (req, res) => {
       location: nativeLocation,
       description,
       images,
-      intelligence
+      intelligence,
+      debugLogs: logs
     });
 
   } catch (error) {
     console.error('Execution error stack:', error);
-    // ALWAYS return JSON so the frontend never crashes with HTML syntax errors
+    logs.push(`[${new Date().toISOString()}] FATAL ERROR: ${error.message}`);
     return res.status(500).json({ 
       error: 'Failed to process listing analysis', 
-      details: error.message || 'Unknown internal server error'
+      details: error.message || 'Unknown internal server error',
+      debugLogs: logs
     });
   }
 };
