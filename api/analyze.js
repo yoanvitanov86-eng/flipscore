@@ -35,59 +35,60 @@ module.exports = async (req, res) => {
   }
 
   let logs = [];
-  logs.push(`[${new Date().toISOString()}] Request received for intent: "${intent}"`);
-  logs.push(`[${new Date().toISOString()}] Target URL: ${url}`);
-
-  try {
-    // 1. Scrape listing data via Apify (capped at 8 seconds for Vercel)
-    let item = {};
-    try {
-      logs.push(`[${new Date().toISOString()}] Triggering Apify actor (memo23/facebook-marketplace-cheerio)...`);
+  logs.push(`[${new Date().toISOString()}] Request received for intent: "${intent}"`); logs.push(`[${new Date().toISOString()}] Target URL: ${url}`);  try { let item = {}; try { logs.push(`[${new Date().toISOString()}] Triggering Apify actor (memo23/facebook-marketplace-scraper-ppe)...`);
+      
+      // Using correct PPE actor endpoint and plain string array for startUrls as specified in docs
       const response = await axios.post(
-        `https://api.apify.com/v2/acts/memo23~facebook-marketplace-cheerio/run-sync-get-dataset-items?token=${apifyToken}`,
-        { 
-          startUrls: [{ url }],
-          includeSeller: true,
-          flattenOutput: true
-        },
-        { timeout: 8000 }
-      );
-      const items = response.data;
-      item = Array.isArray(items) && items.length > 0 ? items[0] : {};
-      logs.push(`[${new Date().toISOString()}] Apify scrape successful. Items retrieved: ${items.length}`);
+        `https://api.apify.com/v2/acts/memo23~facebook-marketplace-scraper-ppe/run-sync-get-dataset-items?token=${apifyToken}`, { startUrls: [url], includeSeller: true, flattenOutput: false }, { timeout: 9000 } );  const items = response.data; item = Array.isArray(items) && items.length > 0 ? items[0] : {}; logs.push(`[${new Date().toISOString()}] Apify scrape successful. Item data retrieved.`);
     } catch (scrapeErr) {
-      logs.push(`[${new Date().toISOString()}] Apify warning/timeout: ${scrapeErr.message}. Proceeding with URL/AI direct evaluation.`);
+      logs.push(`[${new Date().toISOString()}] Apify warning/timeout:${scrapeErr.message}. Falling back to direct AI evaluation.`);
     }
 
     let nativePrice = 'N/A';
-    const priceSource = item.price !== undefined ? item.price : (item.listingPrice !== undefined ? item.listingPrice : item.priceAmount);
+    const priceSource = item.listingPrice || item.price;
     if (priceSource !== undefined && priceSource !== null) {
-      nativePrice = typeof priceSource === 'object' ? (priceSource.formatted || priceSource.amount || 'N/A') : String(priceSource);
+      nativePrice = typeof priceSource === 'object' ? (priceSource.formatted_amount || priceSource.amount || 'N/A') : String(priceSource);
     }
 
     let nativeLocation = 'N/A';
-    const locationSource = item.location !== undefined ? item.location : (item.city !== undefined ? item.city : item.place);
+    const locationSource = item.locationText || item.location;
     if (locationSource !== undefined && locationSource !== null) {
-      nativeLocation = typeof locationSource === 'object' ? (locationSource.name || locationSource.city || 'N/A') : String(locationSource);
+      nativeLocation = typeof locationSource === 'object' ? (locationSource.city || locationSource.name || 'N/A') : String(locationSource);
     }
 
-    const title = item.title || item.heading || url;
-    const description = item.description || item.text || 'Direct link analysis mode.';
-    const images = item.images || item.imageUrls || [];
+    const title = item.listingTitle || item.title || url;
+    const description = item.description || 'No description provided.';
+    const vehicleData = item.vehicle || null;
 
-    // 2. Build Prompt
+    // Format structured vehicle details if available from the PPE actor
+    let vehicleContextStr = '';
+    if (vehicleData) {
+      vehicleContextStr = `
+      Structured Vehicle Data Extracted:
+      - Make: ${vehicleData.make || 'N/A'}
+      - Model: ${vehicleData.model || 'N/A'}
+      - Trim: ${vehicleData.trim || 'N/A'}
+      - Odometer: ${vehicleData.odometer ? vehicleData.odometer.value + ' ' + vehicleData.odometer.unit : 'N/A'}
+      - Transmission: ${vehicleData.transmission || 'N/A'}
+      - Fuel Type: ${vehicleData.fuelType || 'N/A'}
+      - Title Status: ${vehicleData.titleStatus || 'N/A'}
+      - Seller Type: ${vehicleData.sellerType || 'N/A'}
+      `;
+    }
+
     const prompt = `
       You are an expert automotive appraiser, mechanic, and car flipping strategist. 
-      Analyze this car listing based on the title/description and URL provided, keeping in mind the user's buying intent: "${intent}".
+      Analyze this car listing based on the details below, keeping in mind the user's buying intent: "${intent}".
       
       Cross-reference current market pricing, average street value, and common mechanical failure points for this exact vehicle platform/engine.
 
       Listing Data:
       - Source URL: "${url}"
-      - Title/Heading: "${title}"
-      - Listed Price: "${nativePrice}"
+      - Title: "${title}"
+      - Asking Price: "${nativePrice}"
       - Location: "${nativeLocation}"
       - Description: "${description}"
+      ${vehicleContextStr}
 
       Return a strict JSON object (do NOT wrap in markdown code blocks like \`\`\`json, output raw valid JSON only) with this exact structure:
       {
@@ -106,7 +107,6 @@ module.exports = async (req, res) => {
 
     logs.push(`[${new Date().toISOString()}] Sending payload to Gemini API (gemini-2.5-flash)...`);
 
-    // 3. Call Gemini
     const geminiResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
@@ -116,9 +116,8 @@ module.exports = async (req, res) => {
     });
 
     let rawText = geminiResponse.text ? geminiResponse.text.trim() : '';
-    logs.push(`[${new Date().toISOString()}] Raw Gemini response received (${rawText.length} chars).`);
+    logs.push(`[${new Date().toISOString()}] Raw Gemini response received.`);
 
-    // Clean up potential markdown formatting
     rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
     let intelligence;
@@ -145,7 +144,7 @@ module.exports = async (req, res) => {
       price: nativePrice,
       location: nativeLocation,
       description,
-      images,
+      vehicle: vehicleData,
       intelligence,
       debugLogs: logs
     });
